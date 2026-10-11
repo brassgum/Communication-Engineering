@@ -53,10 +53,13 @@ double complex_mag(const complex_t* carrier_a);
 int* br_order_malloc(int bit_size);
 complex_t* fft_malloc(double* input, size_t samples, size_t* out_size);
 complex_t* ifft_malloc(const complex_t* freq_domain, size_t n);
-double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka);
-double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs);
-double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband);
+void print_complex_to_csv(const char* path, const complex_t* data, size_t size, double fs);
+double* am_dsb_lc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, double ka);
+double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier);
+double* am_ssb_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, sideband_t sideband);
 double* noise_malloc(size_t samples, double amplitude);
+double* detect_envelope_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier);
+
 
 int main(int argc, char** argv)
 {
@@ -108,14 +111,19 @@ int main(int argc, char** argv)
 	carrier_d.frequency = FC;
 	carrier_d.phase = 89.0 * PI / 180.0;
 	
-	double* ssb_output = am_ssb_malloc(input, sample.size, &carrier_a, format.sample_rate, SIDEBAND_USB);
-
+	double* ssb_output = am_ssb_malloc(input, sample.size, format.sample_rate, &carrier_a, SIDEBAND_USB);
+	size_t fft_size;
+	complex_t* ssb_fft = fft_malloc(ssb_output, sample.size, &fft_size);
+	print_complex_to_csv("ssb_output.csv", ssb_fft, fft_size, format.sample_rate);
+	
 	release_wav_data(&sample);
 	free(input);
 	free(ssb_output);
+	free(ssb_fft);
+
+	printf("Done!\n");
 	return 0;
 }
-
 
 wav_data_t load_sample(const char* path, format_t* out_header)
 {
@@ -330,7 +338,31 @@ complex_t* ifft_malloc(const complex_t* freq_domain, size_t n)
 	return res;
 }
 
-double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka)
+void print_complex_to_csv(const char* path, const complex_t* data, size_t size, double fs)
+{
+	FILE* file = fopen(path, "w");
+	assert(file != NULL);
+
+	fprintf(file, "Frequency,Magnitude\n");
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		double freq;
+		if (i < size / 2)
+		{
+			freq = (double)i * fs / size;
+		}
+		else
+		{
+			freq = -((double)i - size) * fs / size;
+		}
+		fprintf(file, "%lf,%lf\n", freq, complex_mag(&data[i]));
+	}
+	fclose(file);
+
+}
+
+double* am_dsb_lc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, double ka)
 {
 	assert(carrier->frequency * 2 < fs);
 	double* res = malloc(sizeof(double) * samples);
@@ -346,7 +378,7 @@ double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* c
 	return res;
 }
 
-double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs)
+double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier)
 {
 	assert(carrier->frequency * 2 < fs);
 	double* res = malloc(sizeof(double) * samples);
@@ -362,10 +394,10 @@ double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* c
 	return res;
 }
 
-double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband)
+double* am_ssb_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, sideband_t sideband)
 {
 	assert(carrier->frequency * 2 < fs);
-	double* dsb_modulated = am_dsb_sc_malloc(input, samples, carrier, fs);
+	double* dsb_modulated = am_dsb_sc_malloc(input, samples, fs, carrier);
 
 	complex_t* freq_domain = fft_malloc(dsb_modulated, samples, &samples);
 	free(dsb_modulated);
@@ -445,3 +477,11 @@ double* noise_malloc(size_t samples, double amplitude)
 	return res;
 }
 
+double* detect_envelope_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier)
+{
+	double* res = malloc(sizeof(double) * samples);
+
+
+
+	return res;
+}
