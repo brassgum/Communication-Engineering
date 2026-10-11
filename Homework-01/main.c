@@ -60,14 +60,22 @@ double* noise_malloc(size_t samples, double amplitude);
 
 int main(int argc, char** argv)
 {
-	assert(argc >= 2);
+	
 	const double PI = acos(-1);
 
 	const int FC = 100000; // 100kHz carrier frequency
 	const double AC = 1.0;
 
 	format_t format;
-	wav_data_t sample = load_sample(argv[1], &format);
+	wav_data_t sample;
+	if (argc < 2)
+	{
+		sample = load_sample("sample.wav", &format);
+	}
+	else
+	{
+		sample = load_sample(argv[1], &format);
+	}
 
 	printf("block_size: %d, audio_format: %d, channels: %d,\n"
 		"sample_rate: %d, byte per second: %d, byte per block: %d\n"
