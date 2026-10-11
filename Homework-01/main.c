@@ -11,7 +11,7 @@ typedef struct
 
 #pragma pack(push, 1)
 
-typedef struct format_header_s
+typedef struct format_s
 {
 	unsigned int block_size;
 	unsigned short audio_format;
@@ -20,7 +20,7 @@ typedef struct format_header_s
 	unsigned int byte_per_sec;
 	unsigned short byte_per_block;
 	unsigned short bits_per_sample;
-} format_header_t;
+} format_t;
 
 #pragma pack(pop)
 
@@ -36,14 +36,14 @@ typedef enum sideband
 	SIDEBAND_LSB = 1
 } sideband_t;
 
-typedef struct am_carrier_s
+typedef struct carrier_s
 {
 	double amplitude;
 	double frequency;
 	double phase;
-} am_carrier_t;
+} carrier_t;
 
-wav_data_t load_sample(format_header_t* out_header);
+wav_data_t load_sample(format_t* out_header);
 void release_wav_data(wav_data_t* data);
 complex_t complex_add(const complex_t* a, const complex_t* b);
 complex_t complex_sub(const complex_t* a, const complex_t* b);
@@ -53,25 +53,26 @@ double complex_mag(const complex_t* a);
 int* br_order_malloc(int bit_size);
 complex_t* fft_malloc(double* input, size_t samples, int* out_size);
 complex_t* ifft_malloc(const complex_t* freq_domain, int n);
-double* am_dsb_lc_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs);
-double* am_dsb_sc_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs);
-double* am_ssb_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs, sideband_t sideband);
+double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka);
+double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs);
+double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband);
+double* noise_malloc(size_t samples, double amplitude);
 
 int main(void)
 {
 	const double PI = acos(-1);
 
-	int fc = 100000; // 100kHz carrier frequency
-	double ac = 1.0;
+	const int FC = 100000; // 100kHz carrier frequency
+	const double AC = 1.0;
 
-	format_header_t header;
-	wav_data_t sample = load_sample(&header);
+	format_t format;
+	wav_data_t sample = load_sample(&format);
 
 	printf("block_size: %d, audio_format: %d, channels: %d,\n"
 		"sample_rate: %d, byte per second: %d, byte per block: %d\n"
-		"bits per sample: %d\n", header.block_size, header.audio_format, header.channels
-		, header.sample_rate, header.byte_per_sec, header.byte_per_block
-		, header.bits_per_sample);
+		"bits per sample: %d\n", format.block_size, format.audio_format, format.channels
+		, format.sample_rate, format.byte_per_sec, format.byte_per_block
+		, format.bits_per_sample);
 
 	printf("data size: %d\n", sample.size);
 
@@ -81,6 +82,20 @@ int main(void)
 		input[i] = (double)sample.data[i] / (double)0x7fff;
 	}
 
+	carrier_t a;
+	a.amplitude = AC;
+	a.frequency = FC; // 100 kHz
+	a.phase = 0.0;
+	carrier_t b = a;
+	carrier_t c;
+	c.amplitude = AC;
+	c.frequency = FC - 1; // 99.999 kHz
+	a.phase = 0.0;
+	carrier_t d;
+	d.amplitude = AC;
+	d.frequency = FC;
+	d.phase = 89.0 * PI / 180.0;
+	
 
 	release_wav_data(&sample);
 	free(input);
@@ -88,13 +103,13 @@ int main(void)
 }
 
 
-wav_data_t load_sample(format_header_t* out_header)
+wav_data_t load_sample(format_t* out_header)
 {
 	FILE* sample = fopen("resources/sample.wav", "rb");
 	assert(sample != NULL);
 	wav_data_t res;
 	fseek(sample, 16, SEEK_SET);
-	fread(out_header, sizeof(format_header_t), 1, sample);
+	fread(out_header, sizeof(format_t), 1, sample);
 
 	fseek(sample, out_header->block_size + 24, SEEK_SET);
 	unsigned int data_chunk_size;
@@ -301,18 +316,117 @@ complex_t* ifft_malloc(const complex_t* freq_domain, int n)
 	return res;
 }
 
-double* am_dsb_lc_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs)
+double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka)
 {
+	assert(carrier->frequency * 2 > fs);
+	double* res = malloc(sizeof(double) * samples);
+	assert(res != NULL);
 
-	return NULL;
+	const double PI = acos(-1);
+
+	for (size_t i = 0; i < samples; ++i)
+	{
+		res[i] = carrier->amplitude * (1.0 + ka * input[i]) * cos(2 * PI * carrier->frequency * i / fs + carrier->phase);
+	}
+
+	return res;
 }
 
-double* am_dsb_sc_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs)
+double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs)
 {
-	return NULL;
+	assert(carrier->frequency * 2 > fs);
+	double* res = malloc(sizeof(double) * samples);
+	assert(res != NULL);
+
+	const double PI = acos(-1);
+
+	for (size_t i = 0; i < samples; i++)
+	{
+		res[i] = carrier->amplitude * cos(2 * PI * carrier->frequency * i / fs + carrier->phase) * input[i];
+	}
+
+	return res;
 }
 
-double* am_ssb_malloc(const double* input, size_t samples, const am_carrier_t* carrier, double fs, sideband_t sideband)
+double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband)
 {
+	assert(carrier->frequency * 2 > fs);
+	double* dsb_modulated = am_dsb_sc_malloc(input, samples, carrier, fs);
+
+	complex_t* freq_domain = fft_malloc(dsb_modulated, samples, &samples);
+	free(dsb_modulated);
+
+	
+
+	switch (sideband)
+	{
+	case SIDEBAND_USB:
+	{
+		for (size_t i = 0; i < samples; i++)
+		{
+			double freq;
+			if (i < samples / 2)
+			{
+				freq = (double)i * fs / samples;
+			}
+			else
+			{
+				freq = ((double)i - samples) * fs / samples;
+			}
+
+			if (freq < carrier->frequency)
+			{
+				freq_domain[i].real = 0.0;
+				freq_domain[i].imag = 0.0;
+			}
+		}
+		break;
+	}
+	case SIDEBAND_LSB:
+	{
+		for (size_t i = 0; i < samples; i++)
+		{
+			double freq;
+			if (i < samples / 2)
+			{
+				freq = (double)i * fs / samples;
+			}
+			else
+			{
+				freq = ((double)i - samples) * fs / samples;
+			}
+
+			if (freq > carrier->frequency)
+			{
+				freq_domain[i].real = 0.0;
+				freq_domain[i].imag = 0.0;
+			}
+		}
+		break;
+	}
+	default:
+		assert(0);
+	}
+
+	complex_t* time_domain = ifft_malloc(freq_domain, samples);
+	free(freq_domain);
+
+	double* res = malloc(sizeof(double) * samples);
+	
+	for (size_t i = 0; i < samples; i++)
+	{
+		res[i] = time_domain[i].real;
+	}
+
+	free(time_domain);
+
+	return res;
+}
+
+double* noise_malloc(size_t samples, double amplitude)
+{
+	// gaussian noise
+	assert(0);
+
 	return NULL;
 }
