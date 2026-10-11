@@ -43,7 +43,7 @@ typedef struct carrier_s
 	double phase;
 } carrier_t;
 
-wav_data_t load_sample(format_t* out_header);
+wav_data_t load_sample(const char* path, format_t* out_header);
 void release_wav_data(wav_data_t* data);
 complex_t complex_add(const complex_t* carrier_a, const complex_t* carrier_b);
 complex_t complex_sub(const complex_t* carrier_a, const complex_t* carrier_b);
@@ -51,22 +51,23 @@ complex_t complex_mul(const complex_t* carrier_a, const complex_t* carrier_b);
 complex_t complex_exp(double theta);
 double complex_mag(const complex_t* carrier_a);
 int* br_order_malloc(int bit_size);
-complex_t* fft_malloc(double* input, size_t samples, int* out_size);
-complex_t* ifft_malloc(const complex_t* freq_domain, int n);
+complex_t* fft_malloc(double* input, size_t samples, size_t* out_size);
+complex_t* ifft_malloc(const complex_t* freq_domain, size_t n);
 double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka);
 double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs);
 double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband);
 double* noise_malloc(size_t samples, double amplitude);
 
-int main(void)
+int main(int argc, char** argv)
 {
+	assert(argc >= 2);
 	const double PI = acos(-1);
 
 	const int FC = 100000; // 100kHz carrier frequency
 	const double AC = 1.0;
 
 	format_t format;
-	wav_data_t sample = load_sample(&format);
+	wav_data_t sample = load_sample(argv[1], &format);
 
 	printf("block_size: %d, audio_format: %d, channels: %d,\n"
 		"sample_rate: %d, byte per second: %d, byte per block: %d\n"
@@ -108,9 +109,9 @@ int main(void)
 }
 
 
-wav_data_t load_sample(format_t* out_header)
+wav_data_t load_sample(const char* path, format_t* out_header)
 {
-	FILE* sample = fopen("sample.wav", "rb");
+	FILE* sample = fopen(path, "rb");
 	assert(sample != NULL);
 	wav_data_t res;
 	fseek(sample, 16, SEEK_SET);
@@ -201,13 +202,13 @@ int* br_order_malloc(int bit_size)
 	return res;
 }
 
-complex_t* fft_malloc(double* input, size_t samples, int* out_size)
+complex_t* fft_malloc(double* input, size_t samples, size_t* out_size)
 {
 	const double PI = acos(-1);
 	const complex_t RE1 = { 1.0, 0.0 };
 	// br_order copy
 	int bit_size = (int)ceil(log2(samples));
-	int size = 1 << bit_size;
+	size_t size = 1 << bit_size;
 	complex_t* res = malloc(sizeof(complex_t) * size);
 	assert(res != NULL);
 
@@ -257,7 +258,7 @@ complex_t* fft_malloc(double* input, size_t samples, int* out_size)
 	return res;
 }
 
-complex_t* ifft_malloc(const complex_t* freq_domain, int n)
+complex_t* ifft_malloc(const complex_t* freq_domain, size_t n)
 {
 	int bit_size = (int)ceil(log2(n));
 	int length = 1 << bit_size;
