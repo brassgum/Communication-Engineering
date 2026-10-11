@@ -45,11 +45,11 @@ typedef struct carrier_s
 
 wav_data_t load_sample(format_t* out_header);
 void release_wav_data(wav_data_t* data);
-complex_t complex_add(const complex_t* a, const complex_t* b);
-complex_t complex_sub(const complex_t* a, const complex_t* b);
-complex_t complex_mul(const complex_t* a, const complex_t* b);
+complex_t complex_add(const complex_t* carrier_a, const complex_t* carrier_b);
+complex_t complex_sub(const complex_t* carrier_a, const complex_t* carrier_b);
+complex_t complex_mul(const complex_t* carrier_a, const complex_t* carrier_b);
 complex_t complex_exp(double theta);
-double complex_mag(const complex_t* a);
+double complex_mag(const complex_t* carrier_a);
 int* br_order_malloc(int bit_size);
 complex_t* fft_malloc(double* input, size_t samples, int* out_size);
 complex_t* ifft_malloc(const complex_t* freq_domain, int n);
@@ -82,30 +82,35 @@ int main(void)
 		input[i] = (double)sample.data[i] / (double)0x7fff;
 	}
 
-	carrier_t a;
-	a.amplitude = AC;
-	a.frequency = FC; // 100 kHz
-	a.phase = 0.0;
-	carrier_t b = a;
-	carrier_t c;
-	c.amplitude = AC;
-	c.frequency = FC - 1; // 99.999 kHz
-	a.phase = 0.0;
-	carrier_t d;
-	d.amplitude = AC;
-	d.frequency = FC;
-	d.phase = 89.0 * PI / 180.0;
+	carrier_t carrier_a;
+	carrier_a.amplitude = AC;
+	carrier_a.frequency = FC; // 100 kHz
+	carrier_a.phase = 0.0;
+
+	carrier_t carrier_b = carrier_a;
+
+	carrier_t carrier_c;
+	carrier_c.amplitude = AC;
+	carrier_c.frequency = FC - 1; // 99.999 kHz
+	carrier_c.phase = 0.0;
+
+	carrier_t carrier_d;
+	carrier_d.amplitude = AC;
+	carrier_d.frequency = FC;
+	carrier_d.phase = 89.0 * PI / 180.0;
 	
+	double* ssb_output = am_ssb_malloc(input, sample.size, &carrier_a, format.sample_rate, SIDEBAND_USB);
 
 	release_wav_data(&sample);
 	free(input);
+	free(ssb_output);
 	return 0;
 }
 
 
 wav_data_t load_sample(format_t* out_header)
 {
-	FILE* sample = fopen("resources/sample.wav", "rb");
+	FILE* sample = fopen("sample.wav", "rb");
 	assert(sample != NULL);
 	wav_data_t res;
 	fseek(sample, 16, SEEK_SET);
@@ -136,27 +141,27 @@ void release_wav_data(wav_data_t* data)
 	free(data->data);
 }
 
-complex_t complex_add(const complex_t* a, const complex_t* b)
+complex_t complex_add(const complex_t* carrier_a, const complex_t* carrier_b)
 {
 	complex_t res;
-	res.real = a->real + b->real;
-	res.imag = a->imag + b->imag;
+	res.real = carrier_a->real + carrier_b->real;
+	res.imag = carrier_a->imag + carrier_b->imag;
 	return res;
 }
 
-complex_t complex_sub(const complex_t* a, const complex_t* b)
+complex_t complex_sub(const complex_t* carrier_a, const complex_t* carrier_b)
 {
 	complex_t res;
-	res.real = a->real - b->real;
-	res.imag = a->imag - b->imag;
+	res.real = carrier_a->real - carrier_b->real;
+	res.imag = carrier_a->imag - carrier_b->imag;
 	return res;
 }
 
-complex_t complex_mul(const complex_t* a, const complex_t* b)
+complex_t complex_mul(const complex_t* carrier_a, const complex_t* carrier_b)
 {
 	complex_t res;
-	res.real = a->real * b->real - a->imag * b->imag;
-	res.imag = a->real * b->imag + b->real * a->imag;
+	res.real = carrier_a->real * carrier_b->real - carrier_a->imag * carrier_b->imag;
+	res.imag = carrier_a->real * carrier_b->imag + carrier_b->real * carrier_a->imag;
 	return res;
 }
 
@@ -168,9 +173,9 @@ complex_t complex_exp(double theta)
 	return res;
 }
 
-double complex_mag(const complex_t* a)
+double complex_mag(const complex_t* carrier_a)
 {
-	return sqrt(a->real * a->real + a->imag * a->imag);
+	return sqrt(carrier_a->real * carrier_a->real + carrier_a->imag * carrier_a->imag);
 }
 
 int* br_order_malloc(int bit_size)
@@ -318,7 +323,7 @@ complex_t* ifft_malloc(const complex_t* freq_domain, int n)
 
 double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, double ka)
 {
-	assert(carrier->frequency * 2 > fs);
+	assert(carrier->frequency * 2 < fs);
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
@@ -334,7 +339,7 @@ double* am_dsb_lc_malloc(const double* input, size_t samples, const carrier_t* c
 
 double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs)
 {
-	assert(carrier->frequency * 2 > fs);
+	assert(carrier->frequency * 2 < fs);
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
@@ -350,7 +355,7 @@ double* am_dsb_sc_malloc(const double* input, size_t samples, const carrier_t* c
 
 double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carrier, double fs, sideband_t sideband)
 {
-	assert(carrier->frequency * 2 > fs);
+	assert(carrier->frequency * 2 < fs);
 	double* dsb_modulated = am_dsb_sc_malloc(input, samples, carrier, fs);
 
 	complex_t* freq_domain = fft_malloc(dsb_modulated, samples, &samples);
@@ -425,8 +430,9 @@ double* am_ssb_malloc(const double* input, size_t samples, const carrier_t* carr
 
 double* noise_malloc(size_t samples, double amplitude)
 {
-	// gaussian noise
 	assert(0);
+	double* res = malloc(sizeof(double) * samples);
 
-	return NULL;
+	return res;
 }
+
