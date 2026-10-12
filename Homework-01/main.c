@@ -44,6 +44,7 @@ typedef struct carrier_s
 } carrier_t;
 
 int g_ssb_use_filter = 0;
+double g_ssb_bandwidth = 20000.0;
 
 wav_data_t load_sample(const char* path, format_t* out_header);
 void release_wav_data(wav_data_t* data);
@@ -100,11 +101,40 @@ int main(int argc, char** argv)
 	}
 	mean = mean / sample.size;
 
+	size_t fft_size;
+
+	complex_t* input_fft = fft_malloc(input, sample.size, &fft_size);
+	const complex_t RE0 = { 0.0, 0.0 };
+
+	// LPF
+
+	for (size_t i = 0; i < fft_size; ++i)
+	{
+		double freq;
+		if (i < (fft_size >> 1))
+		{
+			freq = i * format.sample_rate / fft_size;
+		}
+		else
+		{
+			freq = -(i - fft_size) * format.sample_rate / fft_size;
+		}
+		if (freq > 20000.0)
+		{
+			input_fft[i] = RE0;
+		}
+	}
+	complex_t* input_fft_ifft = ifft_malloc(input_fft, fft_size);
+	for (size_t i = 0; i < sample.size; ++i)
+	{
+		input[i] = input_fft_ifft[i].real;
+	}
+
 	printf("sample mean: %lf\n", mean);
 
 	carrier_t carrier_a;
 	carrier_a.amplitude = AC;
-	carrier_a.frequency = FC; // 100 kHz
+	carrier_a.frequency = 50000; // 100 kHz
 	carrier_a.phase = 0.0;
 
 	carrier_t carrier_b = carrier_a;
@@ -121,7 +151,6 @@ int main(int argc, char** argv)
 	
 	double* ssb_usb_output = am_ssb_malloc(input, sample.size, format.sample_rate, &carrier_a, SIDEBAND_USB);
 	
-	size_t fft_size;
 	complex_t* ssb_usb_fft = fft_malloc(ssb_usb_output, sample.size, &fft_size);
 	print_complex_to_csv("out/ssb-usb_output.csv", ssb_usb_fft, fft_size, format.sample_rate);
 	
@@ -129,6 +158,7 @@ int main(int argc, char** argv)
 	complex_t* ssb_lsb_fft = fft_malloc(ssb_lsb_output, sample.size, &fft_size);
 	print_complex_to_csv("out/ssb-lsb_output.csv", ssb_lsb_fft, fft_size, format.sample_rate);	
 
+	printf("hilbert done!\n");
 	g_ssb_use_filter = 1;
 
 	double* ssb_usb_bpf = am_ssb_malloc(input, sample.size, format.sample_rate
@@ -451,7 +481,7 @@ lb_ssb_analytic_signal:
 
 	freq_domain = fft_malloc(input, samples, &fft_size);
 	
-	for (i = 0; i < fft_size; ++i)
+	for (i = 1; i < fft_size; ++i)
 	{
 		if (i < (fft_size >> 1))
 		{
@@ -519,7 +549,7 @@ lb_ssb_bandpass_filter:
 			{
 				freq = -(i - fft_size) * fs / fft_size;
 			}
-			if (freq < carrier->frequency)
+			if (freq < carrier->frequency || freq > carrier->frequency + g_ssb_bandwidth)
 			{
 				freq_domain[i].real = 0.0;
 				freq_domain[i].imag = 0.0;
@@ -537,7 +567,8 @@ lb_ssb_bandpass_filter:
 			{
 				freq = -(i - fft_size) * fs / fft_size;
 			}
-			if (freq > carrier->frequency)
+
+			if (freq > carrier->frequency || freq < carrier->frequency - g_ssb_bandwidth)
 			{
 				freq_domain[i].real = 0.0;
 				freq_domain[i].imag = 0.0;
