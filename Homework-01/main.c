@@ -59,15 +59,13 @@ complex_t* ifft_malloc(const complex_t* freq_domain, size_t n);
 void print_complex_to_csv(const char* path, const complex_t* data, size_t size, double fs);
 double* am_dsb_lc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, double ka);
 double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier);
-double* am_ssb_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, sideband_t sideband);
-double* noise_malloc(size_t samples, double amplitude);
+double* am_ssb_malloc(const double* input, size_t samples, double fs
+	, const carrier_t* carrier, sideband_t sideband);
 double* detect_envelope_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier);
-double* hilbert_transform(double* input, size_t size);
-
+double get_awgn(void);
 
 int main(int argc, char** argv)
-{
-	
+{	
 	const double PI = acos(-1);
 
 	const int FC = 100000; // 100kHz carrier frequency
@@ -282,7 +280,7 @@ int* br_order_malloc(int bit_size)
 
 complex_t* fft_malloc(const double* input, size_t samples, size_t* out_size)
 {
-	const double PI = acos(-1);
+	static const double PI = acos(-1);
 	const complex_t RE1 = { 1.0, 0.0 };
 	// br_order copy
 	int bit_size = (int)ceil(log2(samples));
@@ -353,7 +351,7 @@ complex_t* ifft_malloc(const complex_t* freq_domain, size_t n)
 	complex_t wm;
 	complex_t w;
 	const complex_t RE1 = { 1.0, 0.0 };
-	const double PI = acos(-1);
+	static const double PI = acos(-1);
 	complex_t temp0;
 	complex_t temp1;
 
@@ -429,7 +427,7 @@ double* am_dsb_lc_malloc(const double* input, size_t samples, double fs, const c
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
-	const double PI = acos(-1);
+	static const double PI = acos(-1);
 
 	for (size_t i = 0; i < samples; ++i)
 	{
@@ -446,7 +444,7 @@ double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const c
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
-	const double PI = acos(-1);
+	static const double PI = acos(-1);
 
 	for (size_t i = 0; i < samples; i++)
 	{
@@ -461,7 +459,7 @@ double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const c
 double* am_ssb_malloc(const double* input, size_t samples, double fs, const carrier_t* carrier, sideband_t sideband)
 {
 	assert(carrier->frequency * 2 < fs);
-	const double PI = acos(-1.0);
+	static const double PI = acos(-1.0);
 	size_t fft_size;
 	complex_t* freq_domain;
 	double freq;
@@ -610,5 +608,24 @@ double* detect_envelope_malloc(const double* input, size_t samples, double fs, c
 	double* res = malloc(sizeof(double) * samples);
 
 	return res;
+}
+
+double get_awgn(void)
+{
+	static const double PI = acos(-1.0);
+	double temp0
+	double temp1;
+	double result;
+
+	do 
+	{
+		temp1 = rand() / (double)RAND_MAX;
+
+	} while (temp1 == 0.0);
+
+	temp0 = cos(2.0 * PI * rand() / (double)RAND_MAX);
+	result = sqrt( -2.0 * log(temp1)) * temp0;
+
+	return result;
 }
 
