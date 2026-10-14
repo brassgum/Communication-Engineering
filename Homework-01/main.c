@@ -162,7 +162,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
-			freq = -((i - fft_size) * format.sample_rate / (double)fft_size);
+			freq = (fft_size - i) * format.sample_rate / (double)fft_size;
 		}
 		if (freq > 20000.0)
 		{
@@ -170,11 +170,12 @@ int main(int argc, char** argv)
 		}
 	}
 	complex_t* input_fft_ifft = ifft_malloc(input_fft, fft_size);
+	free(input_fft);
 	for (size_t i = 0; i < sample.size; ++i)
 	{
 		input[i] = input_fft_ifft[i].real;
 	}
-
+	free(input_fft_ifft);
 	printf("sample mean: %lf\n", mean);
 
 	carrier_t carrier[4] = { 0, };
@@ -698,7 +699,7 @@ lb_ssb_bandpass_filter:
 			}
 			else
 			{
-				freq = -((i - fft_size) * fs / fft_size);
+				freq = (fft_size - i) * fs / fft_size;
 			}
 			if (freq < carrier->frequency || freq > carrier->frequency + g_audio_bandwidth)
 			{
@@ -716,7 +717,7 @@ lb_ssb_bandpass_filter:
 			}
 			else
 			{
-				freq = -((i - fft_size) * fs / fft_size);
+				freq = (fft_size - i) * fs / fft_size;
 			}
 
 			if (freq > carrier->frequency || freq < carrier->frequency - g_audio_bandwidth)
@@ -865,7 +866,7 @@ double* demodulate_with_coherent_detection_malloc(const double* signal, size_t s
 		}
 		else
 		{
-			freq = -((fft_size - i) * fs / fft_size);
+			freq = (fft_size - i) * fs / fft_size;
 		}
 
 		if (g_audio_bandwidth < freq)
