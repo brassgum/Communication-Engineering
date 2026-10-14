@@ -45,7 +45,7 @@ typedef struct carrier_s
 } carrier_t;
 
 int g_ssb_use_filter = 0;
-double g_audio_bandwidth = 20000.0;
+double g_audio_bandwidth = 22000.0;
 
 wav_data_t load_sample(const char* path, format_t* out_header);
 
@@ -135,6 +135,7 @@ int main(int argc, char** argv)
 	size_t fft_size;
 
 	complex_t* input_fft = fft_malloc(input, sample.size, &fft_size);
+	print_frequency_domain_to_csv("out/sample.csv", input_fft, fft_size, format.sample_rate);
 	const complex_t RE0 = { 0.0, 0.0 };
 
 	// LPF
