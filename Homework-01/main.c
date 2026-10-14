@@ -99,15 +99,14 @@ int main(int argc, char** argv)
 	const int FC = 100000; // 100kHz carrier frequency
 	const double AC = 1.0;
 	const double KA = 0.8;
-	carrier_t rf_carrier;
+	carrier_t rf_carrier = { 0.0, 0.0, 0.0 };
 	rf_carrier.frequency = FC;
 	rf_carrier.amplitude = AC;
 	rf_carrier.phase = 0.0;
 
 	format_t format;
 	wav_data_t sample;
-
-
+	
 	complex_t* dsb_lc_fft;
 	complex_t* dsb_sc_fft;
 	complex_t* ssb_usb_fft;
@@ -146,6 +145,8 @@ int main(int argc, char** argv)
 
 	size_t fft_size;
 
+	system("mkdir out");
+
 	complex_t* input_fft = fft_malloc(input, sample.size, &fft_size);
 	print_frequency_domain_to_csv("out/sample.csv", input_fft, fft_size, format.sample_rate);
 	const complex_t RE0 = { 0.0, 0.0 };
@@ -176,7 +177,7 @@ int main(int argc, char** argv)
 
 	printf("sample mean: %lf\n", mean);
 
-	carrier_t carrier[4];
+	carrier_t carrier[4] = { 0, };
 	const double SNRs[4] = { 0.0, 30.0, 30.0, 30.0 };
 	
 	for (size_t i = 0; i < 4; ++i)
@@ -195,10 +196,10 @@ int main(int argc, char** argv)
 		double* dsb_sc = am_dsb_sc_malloc(input, sample.size, format.sample_rate, &rf_carrier);
 		double* ssb_usb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_USB);
 		double* ssb_lsb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_LSB);
-		double dsb_lc_p;
-		double dsb_sc_p;
-		double ssb_usb_p;
-		double ssb_lsb_p;
+		double dsb_lc_p = 0.0;
+		double dsb_sc_p = 0.0;
+		double ssb_usb_p = 0.0;
+		double ssb_lsb_p = 0.0;
 		for (size_t j = 0; j < sample.size; ++j)
 		{
 			dsb_lc_p += dsb_lc[j] * dsb_lc[j];
@@ -325,7 +326,7 @@ wav_data_t load_sample(const char* path, format_t* out_header)
 {
 	FILE* sample = fopen(path, "rb");
 	assert(sample != NULL);
-	wav_data_t res;
+	wav_data_t res = { 0, };
 	fseek(sample, 16, SEEK_SET);
 	fread(out_header, sizeof(format_t), 1, sample);
 
@@ -357,7 +358,7 @@ void release_wav_data(wav_data_t* data)
 
 complex_t complex_add(const complex_t* a, const complex_t* b)
 {
-	complex_t res;
+	complex_t res = { 0.0, 0.0 };
 	res.real = a->real + b->real;
 	res.imag = a->imag + b->imag;
 	return res;
@@ -365,7 +366,7 @@ complex_t complex_add(const complex_t* a, const complex_t* b)
 
 complex_t complex_sub(const complex_t* a, const complex_t* b)
 {
-	complex_t res;
+	complex_t res = { 0.0, 0.0 };
 	res.real = a->real - b->real;
 	res.imag = a->imag - b->imag;
 	return res;
@@ -373,7 +374,7 @@ complex_t complex_sub(const complex_t* a, const complex_t* b)
 
 complex_t complex_mul(const complex_t* a, const complex_t* b)
 {
-	complex_t res;
+	complex_t res = { 0.0, 0.0 };
 	res.real = a->real * b->real - a->imag * b->imag;
 	res.imag = a->real * b->imag + b->real * a->imag;
 	return res;
@@ -381,7 +382,7 @@ complex_t complex_mul(const complex_t* a, const complex_t* b)
 
 complex_t complex_exp(double theta)
 {
-	complex_t res;
+	complex_t res = { 0.0, 0.0 };
 	res.real = cos(theta);
 	res.imag = sin(theta);
 	return res;
