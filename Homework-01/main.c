@@ -1,8 +1,8 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
-#include <time.h>
 
 typedef struct
 {
@@ -106,6 +106,18 @@ int main(int argc, char** argv)
 
 	format_t format;
 	wav_data_t sample;
+
+
+	complex_t* dsb_lc_fft;
+	complex_t* dsb_sc_fft;
+	complex_t* ssb_usb_fft;
+	complex_t* ssb_lsb_fft;
+
+	double* demodulated_dsb_lc;
+	double* demodulated_dsb_sc;
+	double* demodulated_ssb_usb;
+	double* demodulated_ssb_lsb;
+
 	if (argc < 2)
 	{
 		sample = load_sample("sample.wav", &format);
@@ -145,11 +157,11 @@ int main(int argc, char** argv)
 		double freq;
 		if (i < (fft_size >> 1))
 		{
-			freq = i * format.sample_rate / fft_size;
+			freq = i * format.sample_rate / (double)fft_size;
 		}
 		else
 		{
-			freq = -(i - fft_size) * format.sample_rate / fft_size;
+			freq = -((i - fft_size) * format.sample_rate / (double)fft_size);
 		}
 		if (freq > 20000.0)
 		{
@@ -205,6 +217,7 @@ int main(int argc, char** argv)
 		double ssb_usb_np = sqrt(ssb_usb_p / power);
 		double ssb_lsb_np = sqrt(ssb_lsb_p / power);	
 
+		srand(0);
 		for (size_t j = 0; j < sample.size; ++j)
 		{
 			double noise = get_awgn();
@@ -219,12 +232,12 @@ int main(int argc, char** argv)
 		const char* channels = "abcd";
 		char path[0x20];
 
-lb_save_freq_domain:
+// lb_save_freq_domain:
 
-		complex_t* dsb_lc_fft = fft_malloc(dsb_lc, sample.size, &fft_size);
-		complex_t* dsb_sc_fft = fft_malloc(dsb_sc, sample.size, &fft_size);
-		complex_t* ssb_usb_fft = fft_malloc(ssb_usb, sample.size, &fft_size);
-		complex_t* ssb_lsb_fft = fft_malloc(ssb_lsb, sample.size, &fft_size);
+		dsb_lc_fft = fft_malloc(dsb_lc, sample.size, &fft_size);
+		dsb_sc_fft = fft_malloc(dsb_sc, sample.size, &fft_size);
+		ssb_usb_fft = fft_malloc(ssb_usb, sample.size, &fft_size);
+		ssb_lsb_fft = fft_malloc(ssb_lsb, sample.size, &fft_size);
 
 		sprintf(path, "out/%c_dsb-lc.csv", channels[i]);
 		print_frequency_domain_to_csv(path, dsb_lc_fft, fft_size, format.sample_rate);
@@ -245,16 +258,16 @@ lb_save_freq_domain:
 		free(ssb_usb_fft);
 		free(ssb_lsb_fft);
 
-lb_demodulation:
+// lb_demodulation:
 
 		// Demodulation
-		double* demodulated_dsb_lc = demodulate_with_envelope_detection_malloc(dsb_lc, sample.size
+		demodulated_dsb_lc = demodulate_with_envelope_detection_malloc(dsb_lc, sample.size
 			, carrier + i, KA);
-		double* demodulated_dsb_sc = demodulate_with_coherent_detection_malloc(dsb_sc, sample.size
+		demodulated_dsb_sc = demodulate_with_coherent_detection_malloc(dsb_sc, sample.size
 			, carrier + i, format.sample_rate);
-		double* demodulated_ssb_usb = demodulate_with_coherent_detection_malloc(ssb_usb, sample.size
+		demodulated_ssb_usb = demodulate_with_coherent_detection_malloc(ssb_usb, sample.size
 			, carrier + i, format.sample_rate);
-		double* demodulated_ssb_lsb = demodulate_with_coherent_detection_malloc(ssb_lsb, sample.size
+		demodulated_ssb_lsb = demodulate_with_coherent_detection_malloc(ssb_lsb, sample.size
 			, carrier + i, format.sample_rate);
 		// Save as wav format
 		sprintf(path, "out/%c_dsb-lc.wav", channels[i]);
@@ -334,6 +347,7 @@ wav_data_t load_sample(const char* path, format_t* out_header)
 lb_malloc_fail:
 	fclose(sample);
 	assert(res.data != NULL);
+	return res;
 }
 
 void release_wav_data(wav_data_t* data)
@@ -403,11 +417,11 @@ int* br_order_malloc(int bit_size)
 
 complex_t* fft_malloc(const double* input, size_t samples, size_t* out_size)
 {
-	static const double PI = acos(-1);
+	const double PI = acos(-1);
 	const complex_t RE1 = { 1.0, 0.0 };
 	// br_order copy
-	int bit_size = (int)ceil(log2(samples));
-	size_t size = 1 << bit_size;
+	int bit_size = (int)ceil(log2((double)samples));
+	size_t size = 1ull << bit_size;
 	complex_t* res = malloc(sizeof(complex_t) * size);
 	assert(res != NULL);
 
@@ -459,7 +473,7 @@ complex_t* fft_malloc(const double* input, size_t samples, size_t* out_size)
 
 complex_t* ifft_malloc(const complex_t* freq_domain, size_t n)
 {
-	int bit_size = (int)ceil(log2(n));
+	int bit_size = (int)ceil(log2((double)n));
 	int length = 1 << bit_size;
 	complex_t* res = malloc(sizeof(complex_t) * length);
 	assert(res != NULL);
@@ -467,14 +481,13 @@ complex_t* ifft_malloc(const complex_t* freq_domain, size_t n)
 	int* br_order = br_order_malloc(bit_size);
 	int i;
 	int j;
-	int k;
 	int idx;
 	int m;
 	int m_half;
 	complex_t wm;
 	complex_t w;
 	const complex_t RE1 = { 1.0, 0.0 };
-	static const double PI = acos(-1);
+	const double PI = acos(-1);
 	complex_t temp0;
 	complex_t temp1;
 
@@ -565,7 +578,7 @@ double* am_dsb_lc_malloc(const double* input, size_t samples, double fs, const c
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
-	static const double PI = acos(-1);
+	const double PI = acos(-1);
 
 	for (size_t i = 0; i < samples; ++i)
 	{
@@ -582,7 +595,7 @@ double* am_dsb_sc_malloc(const double* input, size_t samples, double fs, const c
 	double* res = malloc(sizeof(double) * samples);
 	assert(res != NULL);
 
-	static const double PI = acos(-1);
+	const double PI = acos(-1);
 
 	for (size_t i = 0; i < samples; i++)
 	{
@@ -598,7 +611,7 @@ double* am_ssb_malloc(const double* input, size_t samples, double fs
 	, const carrier_t* carrier, sideband_t sideband)
 {
 	assert(carrier->frequency * 2 < fs);
-	static const double PI = acos(-1.0);
+	const double PI = acos(-1.0);
 	size_t fft_size;
 	complex_t* freq_domain;
 	double freq;
@@ -614,7 +627,7 @@ double* am_ssb_malloc(const double* input, size_t samples, double fs
 		goto lb_ssb_bandpass_filter;
 	}
 
-lb_ssb_analytic_signal:
+// lb_ssb_analytic_signal:
 
 	freq_domain = fft_malloc(input, samples, &fft_size);
 	
@@ -684,7 +697,7 @@ lb_ssb_bandpass_filter:
 			}
 			else
 			{
-				freq = -(i - fft_size) * fs / fft_size;
+				freq = -((i - fft_size) * fs / fft_size);
 			}
 			if (freq < carrier->frequency || freq > carrier->frequency + g_audio_bandwidth)
 			{
@@ -702,7 +715,7 @@ lb_ssb_bandpass_filter:
 			}
 			else
 			{
-				freq = -(i - fft_size) * fs / fft_size;
+				freq = -((i - fft_size) * fs / fft_size);
 			}
 
 			if (freq > carrier->frequency || freq < carrier->frequency - g_audio_bandwidth)
@@ -770,7 +783,7 @@ double* detect_envelope_malloc(const double* input, size_t samples)
 
 double get_awgn(void)
 {
-	static const double PI = acos(-1.0);
+	const double PI = acos(-1.0);
 	double temp0;
 	double temp1;
 	double result;
@@ -791,12 +804,12 @@ void save_as_wav_file(const char* path, const double* input, size_t size, const 
 {
 	FILE* file = fopen(path, "wb");
 	fwrite("RIFF", sizeof(char), 4, file);
-	unsigned int riff_size = size * sizeof(short) + 0x24;
+	unsigned int riff_size = (unsigned int)(size * sizeof(short) + 0x24);
 	fwrite(&riff_size, sizeof(unsigned int), 1, file);
 	fwrite("WAVEfmt ", sizeof(char), 8, file);
 	fwrite(format, sizeof(format_t), 1, file);
 	fwrite("data", sizeof(char), 4, file);
-	unsigned int data_size = size * sizeof(short);
+	unsigned int data_size = (unsigned int)(size * sizeof(short));
 	fwrite(&data_size, sizeof(unsigned int), 1, file);
 
 	for (size_t i = 0; i < size; ++i)
@@ -827,7 +840,7 @@ double* demodulate_with_envelope_detection_malloc(const double* signal, size_t s
 double* demodulate_with_coherent_detection_malloc(const double* signal, size_t size
 	, const carrier_t* carrier, double fs)
 {
-	static const double PI = acos(-1.0);
+	const double PI = acos(-1.0);
 	double* res = malloc(sizeof(double) * size);
 
 	double local_oscillator;
@@ -851,7 +864,7 @@ double* demodulate_with_coherent_detection_malloc(const double* signal, size_t s
 		}
 		else
 		{
-			freq = -(fft_size - i) * fs / fft_size;
+			freq = -((fft_size - i) * fs / fft_size);
 		}
 
 		if (g_audio_bandwidth < freq)
