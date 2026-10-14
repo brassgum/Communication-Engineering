@@ -99,6 +99,10 @@ int main(int argc, char** argv)
 	const int FC = 100000; // 100kHz carrier frequency
 	const double AC = 1.0;
 	const double KA = 0.8;
+	carrier_t rf_carrier;
+	rf_carrier.frequency = FC;
+	rf_carrier.amplitude = AC;
+	rf_carrier.phase = 0.0;
 
 	format_t format;
 	wav_data_t sample;
@@ -168,16 +172,16 @@ int main(int argc, char** argv)
 		carrier[i].frequency = FC;
 		carrier[i].phase = 0.0;
 	}
-	carrier[2].frequency -= 1;
+	carrier[2].frequency = FC - 1;
 	carrier[3].phase = 89.0 * PI / 180.0;
 
 	for (size_t i = 0; i < 4; ++i)
 	{
 		// Modulation
-		double* dsb_lc = am_dsb_lc_malloc(input, sample.size, format.sample_rate, carrier + i, KA);
-		double* dsb_sc = am_dsb_sc_malloc(input, sample.size, format.sample_rate, carrier + i);
-		double* ssb_usb = am_ssb_malloc(input, sample.size, format.sample_rate, carrier + i, SIDEBAND_USB);
-		double* ssb_lsb = am_ssb_malloc(input, sample.size, format.sample_rate, carrier + i, SIDEBAND_LSB);
+		double* dsb_lc = am_dsb_lc_malloc(input, sample.size, format.sample_rate, &rf_carrier, KA);
+		double* dsb_sc = am_dsb_sc_malloc(input, sample.size, format.sample_rate, &rf_carrier);
+		double* ssb_usb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_USB);
+		double* ssb_lsb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_LSB);
 		double dsb_lc_p;
 		double dsb_sc_p;
 		double ssb_usb_p;
@@ -212,7 +216,7 @@ int main(int argc, char** argv)
 
 		size_t fft_size;
 		const char* channels = "abcd";
-		char path[20];
+		char path[0x20];
 
 lb_save_freq_domain:
 
@@ -263,6 +267,27 @@ lb_demodulation:
 
 		sprintf(path, "out/%c_ssb-lsb.wav", channels[i]);
 		save_as_wav_file(path, demodulated_ssb_lsb, sample.size, &format);
+
+		// Save time domain csv file
+
+		double* env_dm_dsb_lc = detect_envelope_malloc(demodulated_dsb_lc, sample.size);
+		double* env_dm_dsb_sc = detect_envelope_malloc(demodulated_dsb_sc, sample.size);
+		double* env_dm_ssb_usb = detect_envelope_malloc(demodulated_ssb_usb, sample.size);
+		double* env_dm_ssb_lsb = detect_envelope_malloc(demodulated_ssb_lsb, sample.size);
+
+		sprintf(path, "out/%c_dsb-lc_dm-env.csv", channels[i]);
+		print_time_domain_to_csv(path, env_dm_dsb_lc, sample.size, format.sample_rate);
+		sprintf(path, "out/%c_dsb-sc_dm-env.csv", channels[i]);
+		print_time_domain_to_csv(path, env_dm_dsb_sc, sample.size, format.sample_rate);
+		sprintf(path, "out/%c_ssb-usb_dm-env.csv", channels[i]);
+		print_time_domain_to_csv(path, env_dm_ssb_usb, sample.size, format.sample_rate);
+		sprintf(path, "out/%c_ssb-lsb_dm_env.csv", channels[i]);
+		print_time_domain_to_csv(path, env_dm_ssb_lsb, sample.size, format.sample_rate);
+
+		free(env_dm_dsb_lc);
+		free(env_dm_dsb_sc);
+		free(env_dm_ssb_usb);
+		free(env_dm_ssb_lsb);
 
 		free(demodulated_dsb_lc);
 		free(demodulated_dsb_sc);
@@ -527,7 +552,7 @@ void print_time_domain_to_csv(const char* path, const double* data, size_t size,
 
 	for (size_t i = 0; i < size; ++i)
 	{
-		double time = (double)i * fs / (double)size;
+		double time = (double)i / fs;
 		fprintf(file, "%lf,%lf\n", time, data[i]);
 	}
 	fclose(file);
