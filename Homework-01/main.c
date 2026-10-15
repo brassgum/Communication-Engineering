@@ -284,8 +284,7 @@ int main(int argc, char** argv)
 		sprintf(path, "out/%c_ssb-lsb.wav", channels[i]);
 		save_as_wav_file(path, demodulated_ssb_lsb, sample.size, &format);
 
-		// Save time domain csv file
-
+		// Save time domain envleope csv file
 		double* env_dm_dsb_lc = detect_envelope_malloc(demodulated_dsb_lc, sample.size);
 		double* env_dm_dsb_sc = detect_envelope_malloc(demodulated_dsb_sc, sample.size);
 		double* env_dm_ssb_usb = detect_envelope_malloc(demodulated_ssb_usb, sample.size);
@@ -299,6 +298,25 @@ int main(int argc, char** argv)
 		print_time_domain_to_csv(path, env_dm_ssb_usb, sample.size, format.sample_rate);
 		sprintf(path, "out/%c_ssb-lsb_dm_env.csv", channels[i]);
 		print_time_domain_to_csv(path, env_dm_ssb_lsb, sample.size, format.sample_rate);
+
+		complex_t* fft_dm_dsb_lc = fft_malloc(demodulated_dsb_lc, sample.size, &fft_size);
+		complex_t* fft_dm_dsb_sc = fft_malloc(demodulated_dsb_sc, sample.size, &fft_size);
+		complex_t* fft_dm_ssb_usb = fft_malloc(demodulated_ssb_usb, sample.size, &fft_size);
+		complex_t* fft_dm_ssb_lsb = fft_malloc(demodulated_ssb_lsb, sample.size, &fft_size);
+
+		sprintf(path, "out/%c_dsb-lc_dm-fft.csv", channels[i]);
+		print_frequency_domain_to_csv(path, fft_dm_dsb_lc, fft_size, format.sample_rate);
+		sprintf(path, "out/%c_dsb-sc_dm-fft.csv", channels[i]);
+		print_frequency_domain_to_csv(path, fft_dm_dsb_sc, fft_size, format.sample_rate);
+		sprintf(path, "out/%c_ssb-usb_dm-fft.csv", channels[i]);
+		print_frequency_domain_to_csv(path, fft_dm_ssb_usb, fft_size, format.sample_rate);
+		sprintf(path, "out/%c_ssb-lsb_dm-fft.csv", channels[i]);
+		print_frequency_domain_to_csv(path, fft_dm_ssb_lsb, fft_size, format.sample_rate);
+
+		free(fft_dm_dsb_lc);
+		free(fft_dm_dsb_sc);
+		free(fft_dm_ssb_usb);
+		free(fft_dm_ssb_lsb);
 
 		free(env_dm_dsb_lc);
 		free(env_dm_dsb_sc);
