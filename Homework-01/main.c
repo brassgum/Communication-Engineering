@@ -99,10 +99,10 @@ int main(int argc, char** argv)
 	const int FC = 100000; // 100kHz carrier frequency
 	const double AC = 1.0;
 	const double KA = 0.8;
-	carrier_t rf_carrier = { 0.0, 0.0, 0.0 };
-	rf_carrier.frequency = FC;
-	rf_carrier.amplitude = AC;
-	rf_carrier.phase = 0.0;
+	carrier_t tr_carrier = { 0.0, 0.0, 0.0 };
+	tr_carrier.frequency = FC;
+	tr_carrier.amplitude = AC;
+	tr_carrier.phase = 0.0;
 
 	format_t format;
 	wav_data_t sample;
@@ -193,10 +193,10 @@ int main(int argc, char** argv)
 	for (size_t i = 0; i < 4; ++i)
 	{
 		// Modulation
-		double* dsb_lc = am_dsb_lc_malloc(input, sample.size, format.sample_rate, &rf_carrier, KA);
-		double* dsb_sc = am_dsb_sc_malloc(input, sample.size, format.sample_rate, &rf_carrier);
-		double* ssb_usb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_USB);
-		double* ssb_lsb = am_ssb_malloc(input, sample.size, format.sample_rate, &rf_carrier, SIDEBAND_LSB);
+		double* dsb_lc = am_dsb_lc_malloc(input, sample.size, format.sample_rate, &tr_carrier, KA);
+		double* dsb_sc = am_dsb_sc_malloc(input, sample.size, format.sample_rate, &tr_carrier);
+		double* ssb_usb = am_ssb_malloc(input, sample.size, format.sample_rate, &tr_carrier, SIDEBAND_USB);
+		double* ssb_lsb = am_ssb_malloc(input, sample.size, format.sample_rate, &tr_carrier, SIDEBAND_LSB);
 		double dsb_lc_p = 0.0;
 		double dsb_sc_p = 0.0;
 		double ssb_usb_p = 0.0;
