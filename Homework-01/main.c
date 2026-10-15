@@ -284,6 +284,12 @@ int main(int argc, char** argv)
 		sprintf(path, "out/%c_ssb-lsb.wav", channels[i]);
 		save_as_wav_file(path, demodulated_ssb_lsb, sample.size, &format);
 
+		sprintf(path, "out/%c_ssb-usb_dm.csv", channels[i]);
+		print_time_domain_to_csv(path, demodulated_ssb_usb, sample.size, format.sample_rate);
+		sprintf(path, "out/%c_ssb-lsb_dm.csv", channels[i]);
+		print_time_domain_to_csv(path, demodulated_ssb_usb, sample.size, format.sample_rate);
+
+
 		// Save time domain envleope csv file
 		double* env_dm_dsb_lc = detect_envelope_malloc(demodulated_dsb_lc, sample.size);
 		double* env_dm_dsb_sc = detect_envelope_malloc(demodulated_dsb_sc, sample.size);

@@ -1,5 +1,5 @@
 $csvFiles = Get-ChildItem -Path "./out" -Filter "*.csv"
 
 foreach ($file in $csvFiles) {
-    python visualize.py $file.FullName
+    python save_fig.py $file.FullName
 }

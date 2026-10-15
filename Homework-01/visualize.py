@@ -20,9 +20,9 @@ def plot_csv(path):
 
 	plt.grid(True)
 	plt.tight_layout()
-#	plt.show()
-	plt.savefig(path + '.png', dpi = 300, bbox_inches = 'tight')
-	plt.close()
+	plt.show()
+#	plt.savefig(path + '.png', dpi = 300, bbox_inches = 'tight')
+#	plt.close()
 
 if __name__ == "__main__":
 	if len(sys.argv) >= 2:
